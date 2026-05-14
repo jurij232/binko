@@ -42,7 +42,6 @@ def embed_image(img):
     with torch.no_grad():
         embedding = embedder(tensor)
     # Takoj sprosti RAM
-    torch.cuda.empty_cache() if torch.cuda.is_available() else None
     return embedding.numpy().flatten().reshape(1, -1)
 
 @app.route("/predict", methods=["POST"])
