@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Odpadko</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<link rel="icon" href="binko.png"> 
+<style>
+body{
+  font-family:Arial;
+  display:flex;
+  flex-direction:column;
+  height:100vh;
+  box-sizing:border-box;
+  margin:0;
+  padding:0
+}
+
+/* TOPBAR */
+.topbar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:1px 20px;
+  background:#ede8e0
+}
+.logo img{height:70px}
+.hamburger span{
+  display:block;
+  width:26px;
+  height:3px;
+  background:#76ae69;
+  margin:4px
+}
+
+/* MENU */
+.menu{position:fixed;
+  top:0;
+  right:0;
+  width:220px;
+  height:100%;
+  background:#ede8e0;
+  padding:60px 20px;
+  transform:translateX(100%);
+  opacity:0;visibility:hidden;
+  transition:.3s;
+  z-index:300
+}
+.menu.open{
+  transform:none;
+  opacity:1;
+  visibility:visible
+}
+.menu .close{
+  position:absolute;
+  top:15px;
+  right:15px;
+  font-size:22px;
+  background:none;
+  border:none;
+  cursor:pointer
+}
+.menu p{
+  cursor:pointer;
+  padding:8px 4px;
+  border-radius:8px;
+  transition:background .15s;margin:4px 0
+}
+.menu p:hover{background:rgba(118,174,105,.15)}
+
+/* PHONE */
+.page{
+  flex:1;
+  display:flex;
+  justify-content:center;
+  align-items:center
+}
+.phone{
+  width:360px;
+  height:600px;
+  background:#1a1a1a;
+  border-radius:30px;
+  position:relative;
+  overflow:hidden;
+  transform:scale(1.2)
+}
+#camera,#frozenFrame{
+  position:absolute;
+  width:101%;
+  height:101%;
+  object-fit:cover
+}
+#frozenFrame{display:none;z-index:2}
+.hint{
+  position:absolute;
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%);
+  color:#555
+}
+
+/* SNAP BUTTON */
+.snap{
+  position:absolute;
+  bottom:80px;
+  left:50%;
+  transform:translateX(-50%);
+  width:70px;
+  height:70px;
+  border-radius:50%;
+  border:4px solid #76ae69;
+  background:white;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  transition:.1s;
+  z-index:4
+}
+.snap-inner{
+  width:50px;
+  height:50px;
+  border-radius:50%;
+  background:#76ae69;
+  transition:.1s;
+  flex-shrink:0
+}
+.snap-spinner{
+  display:none;
+  width:50px;
+  height:50px;
+  border-radius:50%;
+  border:4px solid rgba(118,174,105,.2);
+  border-top-color:#76ae69;
+  animation:spin .7s linear infinite;
+  flex-shrink:0
+}
+
+@keyframes spin{to{transform:rotate(360deg)}}
+.snap.loading .snap-inner{display:none}
+.snap.loading .snap-spinner{display:block}
+.snap.loading{cursor:not-allowed;border-color:rgba(118,174,105,.4)}
+.snap:active:not(.loading){transform:translateX(-50%) scale(.9)}
+.snap:active:not(.loading) .snap-inner{background:#5a9050}
+
+/* FLASH */
+.flash{position:absolute;inset:0;background:white;opacity:0;pointer-events:none;z-index:10}
+.flash.fire{animation:flash .35s ease-out forwards}
+@keyframes flash{0%{opacity:.9}100%{opacity:0}}
+
+/* RESULT */
+.result{
+  position:absolute;
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%) scale(.8);
+  width:82%;
+  max-width:285px;
+  background:white;
+  border-radius:22px;
+  padding:22px 20px 18px;
+  text-align:center;
+  box-shadow:0 10px 30px rgba(0,0,0,.3);
+  opacity:0;
+  visibility:hidden;
+  transition:.2s ease;
+  z-index:5
+}
+.result.open{
+  opacity:1;
+  visibility:visible;
+  transform:translate(-50%,-50%) scale(1)
+}
+.result .close{
+  position:absolute;
+  top:10px;
+  right:12px;
+  border:none;
+  background:none;
+  font-size:18px;
+  cursor:pointer
+}
+.result h2{
+  margin:6px 0 3px;
+  font-size:12px;
+  color:#aaa;
+  font-weight:600;
+  text-transform:uppercase;
+  letter-spacing:.08em
+}
+.result-name{font-size:17px;
+  font-weight:700;
+  color:#1a1a1a;
+  margin:0 0 8px
+}
+.bin-wrap{margin:0 auto 4px;width:64px;height:82px}
+.bin-wrap svg{width:100%;height:100%}
+.bin-label{
+  display:inline-block;
+  font-size:11px;
+  font-weight:600;
+  letter-spacing:.04em;
+  padding:4px 12px;
+  border-radius:20px;
+  margin-top:4px
+}
+.wrong-btn{
+  display:inline-flex;
+  align-items:center;
+  gap:5px;margin-top:10px;
+  padding:6px 14px;border-radius:20px;
+  border:1px solid #e0d8cc;
+  background:none;font-size:12px;
+  color:#999;cursor:pointer;
+  transition:.15s
+}
+.wrong-btn:hover,.wrong-btn.confirmed{border-color:#c84f4f;color:#c84f4f;background:#fff0f0}
+
+/* OVERLAY PANELS */
+.overlay{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.45);
+  z-index:200;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  opacity:0;visibility:hidden;
+  transition:opacity .25s,visibility .25s
+}
+.overlay.open{
+  opacity:1;
+  visibility:visible
+}
+.panel{
+  background:#faf8f4;
+  border-radius:20px;
+  width:340px;
+  max-height:78vh;
+  overflow:hidden;
+  display:flex;flex-direction:column;
+  box-shadow:0 20px 60px rgba(0,0,0,.25);
+  transform:translateY(22px);
+  transition:transform .25s
+}
+.overlay.open .panel{transform:none}
+.panel-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:18px 20px 14px;
+  border-bottom:1px solid #e8e2d8;
+  flex-shrink:0
+}
+.panel-head h3{
+  margin:0;
+  font-size:17px;
+  color:#2a2a2a
+}
+.panel-head button{
+  background:none;
+  border:none;
+  font-size:20px;
+  cursor:pointer;
+  color:#888
+}
+.panel-body{
+  overflow-y:auto;
+  flex:1;
+  padding:10px 0
+}
+.panel-foot{
+  padding:14px 20px;
+  border-top:1px solid #e8e2d8;
+  text-align:center;
+  flex-shrink:0
+}
+.panel-foot button{
+  background:none;
+  border:1px solid #e0d8cc;
+  padding:7px 20px;
+  border-radius:30px;
+  font-size:13px;color:#999;
+  cursor:pointer;
+  transition:.15s
+}
+.panel-foot button:hover{border-color:#c84f4f;color:#c84f4f}
+
+/* HISTORY */
+.h-empty{text-align:center;color:#aaa;padding:40px 20px;font-size:14px}
+.h-item{
+  display:flex;
+  align-items:center;
+  gap:14px;padding:12px 20px;
+  border-bottom:1px solid #f0ebe2;
+  transition:background .15s
+}
+.h-item:last-child{border-bottom:none}
+.h-item:hover{background:rgba(118,174,105,.07)}
+.h-thumb{
+  width:52px;
+  height:52px;
+  border-radius:10px;
+  object-fit:cover;
+  flex-shrink:0;
+  background:#ddd
+}
+.h-info{
+  flex:1;
+  min-width:0
+}
+.h-result{
+  font-size:14px;font-weight:600;color:#2a2a2a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.h-time{
+  font-size:11px;
+  color:#aaa;
+  margin-top:3px
+}
+.h-flag{
+  font-size:10px;
+  padding:2px 8px;
+  border-radius:10px;
+  border:1px solid #e0d8cc;
+  background:none;
+  color:#bbb;
+  cursor:pointer;
+  transition:.15s;
+  margin-top:4px;
+  display:inline-block
+}
+.h-flag:hover{border-color:#c84f4f;color:#c84f4f}
+.h-flag.flagged{border-color:#c84f4f;color:#c84f4f;cursor:default}
+
+/* MAP */
+.map-wrap{
+  flex:1;
+  position:relative;
+  min-height:320px
+}
+#mapEl{
+  width:100%;
+  height:100%;
+  min-height:320px
+}
+.map-legend{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  padding:10px 16px;
+  border-top:1px solid #e8e2d8;
+  flex-shrink:0
+}
+.map-legend span{
+  display:flex;
+  align-items:center;
+  gap:5px;
+  font-size:11px;
+  color:#555
+}
+.dot{
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  flex-shrink:0
+}
+
+.map-status{
+  position:absolute;
+  bottom:10px;
+  left:50%;
+  transform:translateX(-50%);
+  background:rgba(0,0,0,.6);
+  color:white;
+  font-size:12px;
+  padding:5px 14px;
+  border-radius:20px;
+  pointer-events:none;
+  white-space:nowrap;
+  opacity:0;
+  transition:opacity .3s;
+  z-index:500
+
+}
+.map-status.show{opacity:1}
+
+/* MOBILE */
+.mobile-bar{
+  position:absolute;
+  top:0;
+  left:0;
+  right:0;
+  display:none;
+  justify-content:space-between;
+  align-items:center;
+  padding:1px 20px;
+  background:rgba(237,232,224,.9);
+  z-index:3
+}
+@media(max-width:600px){
+  .topbar{display:none}
+  .mobile-bar{display:flex}
+  .page{padding:0}
+  .phone{width:100%;height:100dvh;border-radius:0;transform:none}
+  .panel{width:92vw;max-height:82vh}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo"><img src="binko.png"></div>
+  <div class="hamburger" onclick="toggleMenu()"><span></span><span></span><span></span></div>
+</div>
+
+<div class="menu" id="menu">
+  <button class="close" onclick="toggleMenu()">✕</button>
+  <p onclick="openPanel('history');renderHistory()">📜 History</p>
+  <p onclick="openPanel('map');initMap()">🗺️ Map</p>
+  <p onclick="openPanel('about')">ℹ️ About</p>
+</div>
+
+<div class="page">
+  <div class="phone">
+    <div class="mobile-bar">
+      <div class="logo"><img src="binko.png"></div>
+      <div class="hamburger" onclick="toggleMenu()"><span></span><span></span><span></span></div>
+    </div>
+    <video id="camera" autoplay playsinline></video>
+    <canvas id="canvas" style="display:none"></canvas>
+    <img id="frozenFrame" alt="">
+    <div class="flash" id="flash"></div>
+    <span class="hint" id="hint">point at trash</span>
+    <button class="snap" id="snapBtn" onclick="takePhoto()">
+      <div class="snap-inner"></div>
+      <div class="snap-spinner"></div>
+    </button>
+    <div class="result" id="result">
+      <button class="close" onclick="closeResult()">✕</button>
+      <div class="bin-wrap" id="binIcon"></div>
+      <h2>goes into</h2>
+      <div class="bin-label" id="binLabel"></div>
+      <div class="result-name" id="resultText">—</div>
+      <button class="wrong-btn" id="wrongBtn" onclick="flagResult()">👎 AI was wrong</button>
+    </div>
+  </div>
+</div>
+
+<!-- HISTORY -->
+<div class="overlay" id="historyOverlay" onclick="backdropClose(event,'historyOverlay')">
+  <div class="panel">
+    <div class="panel-head"><h3>📜 History</h3><button onclick="closePanel('history')">✕</button></div>
+    <div class="panel-body" id="historyList"></div>
+    <div class="panel-foot"><button onclick="clearHistory()">Clear history</button></div>
+  </div>
+</div>
+
+<!-- ABOUT -->
+<div class="overlay" id="aboutOverlay" onclick="backdropClose(event,'aboutOverlay')">
+  <div class="panel">
+    <div class="panel-head"><h3>ℹ️ About</h3><button onclick="closePanel('about')">✕</button></div>
+    <div class="panel-body" style="padding:20px;color:#444;font-size:14px;line-height:1.6">
+      <h2>About Odpadko</h2>
+      <p>Odpadko predicts waste type from a photo and helps you sort it into the correct bin.</p>
+      <p>It recognises plastic, paper, glass, metal, organic waste, batteries, clothes, and general waste.</p>
+      <p>Includes a map with nearby recycling locations and a history of previous scans.</p>
+      <p>Predictions are not always 100% accurate. Always double-check important waste before disposal.</p>
+    </div>
+  </div>
+</div>
+
+<!-- MAP -->
+<div class="overlay" id="mapOverlay" onclick="backdropClose(event,'mapOverlay')">
+  <div class="panel">
+    <div class="panel-head"><h3>🗺️ Nearby recycling</h3><button onclick="closePanel('map')">✕</button></div>
+    <div class="map-wrap"><div id="mapEl"></div><div class="map-status" id="mapStatus"></div></div>
+    <div class="map-legend">
+      <span><div class="dot" style="background:#76ae69"></div>Recycling Centre</span>
+      <span><div class="dot" style="background:#3764f8"></div>you</span>
+    </div>
+  </div>
+</div>
+
+<script>
+
+// bin types - maps what the AI says to which bin color and label
+var bins = {
+  plastic:    { color: "#e8b84b", label: "Yellow bin — Plastic" },
+  metal:      { color: "#e8b84b", label: "Yellow bin — Metal" },
+  paper:      { color: "#5b9bd5", label: "Blue bin — Paper" },
+  cardboard:  { color: "#5b9bd5", label: "Blue bin — Cardboard" },
+  glass:      { color: "#76ae69", label: "Green bin — Glass" },
+  biological: { color: "#8B5E3C", label: "Brown bin — Organic" },
+  battery:    { color: "#c25f5f", label: "Special — Battery" },
+  clothes:    { color: "#888",    label: "Donation bin — Clothes & Shoes" },
+  shoes:      { color: "#888",    label: "Donation bin — Clothes & Shoes" },
+  general:    { color: "#888",    label: "Gray bin — General waste" }
+}
+
+function getBin(text) {
+  var t = text.toLowerCase()
+  for (var key in bins) {
+    if (t.includes(key)) return bins[key]
+  }
+  return bins.general
+}
+
+// draws the bin svg, c = color
+function binSVG(c) {
+  var shadow = c === "#888" ? "#666" : c + "bb"
+  return `<svg viewBox="0 0 72 90" xmlns="http://www.w3.org/2000/svg">
+    <rect x="27" y="7" width="18" height="8" rx="4" fill="${c}" opacity=".65"/>
+    <rect x="7" y="13" width="58" height="10" rx="5" fill="${c}"/>
+    <rect x="7" y="20" width="58" height="3" fill="${shadow}" opacity=".25"/>
+    <path d="M13 23 L59 23 L54 83 Q53 87 49 87 L23 87 Q19 87 18 83 Z" fill="${c}"/>
+    <line x1="29" y1="28" x2="27" y2="81" stroke="white" stroke-width="2.5" stroke-linecap="round" opacity=".3"/>
+    <line x1="36" y1="28" x2="36" y2="81" stroke="white" stroke-width="2.5" stroke-linecap="round" opacity=".3"/>
+    <line x1="43" y1="28" x2="45" y2="81" stroke="white" stroke-width="2.5" stroke-linecap="round" opacity=".3"/>
+    <path d="M17 28 Q16 50 17 68" stroke="white" stroke-width="3" stroke-linecap="round" fill="none" opacity=".18"/>
+  </svg>`
+}
+
+// menu open/close
+function toggleMenu() {
+  document.getElementById("menu").classList.toggle("open")
+}
+
+// open/close the popup panels
+function openPanel(name) {
+  toggleMenu()
+  document.getElementById(name + "Overlay").classList.add("open")
+}
+
+function closePanel(name) {
+  document.getElementById(name + "Overlay").classList.remove("open")
+}
+
+// close when clicking outside the panel box
+function backdropClose(e, id) {
+  if (e.target === document.getElementById(id)) {
+    document.getElementById(id).classList.remove("open")
+  }
+}
+
+// start the camera
+navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+  .then(function(stream) {
+    document.getElementById("camera").srcObject = stream
+  })
+  .catch(function(err) {
+    console.log("camera didnt work:", err)
+  })
+
+// history stuff - saved in localstorage so it persists
+var scanHistory = JSON.parse(localStorage.getItem("odpadko_history") || "[]")
+
+function saveHistory() {
+  localStorage.setItem("odpadko_history", JSON.stringify(scanHistory))
+}
+
+function addToHistory(result, thumb) {
+  scanHistory.unshift({
+    result: result,
+    thumb: thumb,
+    time: new Date().toLocaleString()
+  })
+  // dont let it grow forever
+  if (scanHistory.length > 50) scanHistory.pop()
+  saveHistory()
+}
+
+function renderHistory() {
+  var list = document.getElementById("historyList")
+  if (scanHistory.length === 0) {
+    list.innerHTML = '<div class="h-empty">No scans yet</div>'
+    return
+  }
+  var html = ""
+  for (var i = 0; i < scanHistory.length; i++) {
+    var item = scanHistory[i]
+    var flagged = item.wrong ? "flagged" : ""
+    var flagText = item.wrong ? "✗ Flagged" : "👎 AI was wrong"
+    var flagDisabled = item.wrong ? "disabled" : ""
+    var wrongTag = item.wrong ? '<span style="color:#c84f4f;font-size:10px">✗ flagged</span>' : ""
+    html += `<div class="h-item">
+      <img class="h-thumb" src="${item.thumb}">
+      <div class="h-info">
+        <div class="h-result">${item.result} ${wrongTag}</div>
+        <div class="h-time">${item.time}</div>
+        <button class="h-flag ${flagged}" onclick="flagHistory(${i})" ${flagDisabled}>${flagText}</button>
+      </div>
+    </div>`
+  }
+  list.innerHTML = html
+}
+
+function clearHistory() {
+  scanHistory = []
+  saveHistory()
+  renderHistory()
+}
+
+function flagHistory(i) {
+  scanHistory[i].wrong = true
+  saveHistory()
+  renderHistory()
+}
+
+// show the result popup
+function showResult(text) {
+  var bin = getBin(text)
+
+  document.getElementById("resultText").innerText = text
+  document.getElementById("binIcon").innerHTML = binSVG(bin.color)
+
+  var lbl = document.getElementById("binLabel")
+  lbl.innerText = bin.label
+  lbl.style.background = bin.color + "22"
+  lbl.style.color = bin.color === "#888" ? "#666" : bin.color
+
+  // reset the wrong button
+  var wrongBtn = document.getElementById("wrongBtn")
+  wrongBtn.classList.remove("confirmed")
+  wrongBtn.textContent = "👎 AI was wrong"
+
+  document.getElementById("result").classList.add("open")
+}
+
+function closeResult() {
+  document.getElementById("result").classList.remove("open")
+  document.getElementById("frozenFrame").style.display = "none"
+  document.getElementById("camera").style.display = "block"
+}
+
+function flagResult() {
+  var btn = document.getElementById("wrongBtn")
+  if (btn.classList.contains("confirmed")) return
+  btn.classList.add("confirmed")
+  btn.textContent = "✗ Flagged — thanks!"
+  if (scanHistory.length > 0) {
+    scanHistory[0].wrong = true
+    saveHistory()
+  }
+}
+
+// take photo and send to server
+async function takePhoto() {
+  var btn = document.getElementById("snapBtn")
+  if (btn.classList.contains("loading")) return
+
+  var video = document.getElementById("camera")
+  var canvas = document.getElementById("canvas")
+  canvas.width = video.videoWidth
+  canvas.height = video.videoHeight
+  canvas.getContext("2d").drawImage(video, 0, 0)
+
+  var dataUrl = canvas.toDataURL("image/jpeg", 0.92)
+
+  // freeze the frame
+  var frozen = document.getElementById("frozenFrame")
+  frozen.src = dataUrl
+  frozen.style.display = "block"
+  video.style.display = "none"
+
+  // flash effect
+  var flash = document.getElementById("flash")
+  flash.classList.remove("fire")
+  void flash.offsetWidth // force reflow so animation restarts
+  flash.classList.add("fire")
+
+  btn.classList.add("loading")
+
+  canvas.toBlob(async function(blob) {
+    var result = "general waste"
+    try {
+      var fd = new FormData()
+      fd.append("image", blob, "photo.jpg")
+      var res = await fetch("http://localhost:5000/predict", { method: "POST", body: fd })
+      var data = await res.json()
+      result = data.result
+    } catch (e) {
+      console.log("something went wrong with the AI:", e)
+      result = "error"
+    }
+
+    btn.classList.remove("loading")
+    addToHistory(result, dataUrl)
+    showResult(result)
+  }, "image/jpeg", 0.92)
+}
+
+// map stuff
+var mapInstance = null
+
+function setMapStatus(msg, autohide) {
+  if (autohide === undefined) autohide = true
+  var el = document.getElementById("mapStatus")
+  el.innerText = msg
+  el.classList.add("show")
+  if (autohide) {
+    setTimeout(function() { el.classList.remove("show") }, 3500)
+  }
+}
+
+function circleIcon(color) {
+  return L.divIcon({
+    className: "",
+    html: `<div style="width:14px;height:14px;border-radius:50%;background:${color};border:2.5px solid white;box-shadow:0 1px 5px rgba(0,0,0,.35)"></div>`,
+    iconSize: [14, 14],
+    iconAnchor: [7, 7]
+  })
+}
+
+async function loadRecyclingPoints(map, lat, lng) {
+  setMapStatus("Loading nearby dumps...", false)
+
+  var query = `[out:json][timeout:20];(
+    node["amenity"="waste_disposal"](around:2000,${lat},${lng});
+    node["landuse"="landfill"](around:2000,${lat},${lng});
+    node["amenity"="recycling"]["recycling_type"="centre"](around:2000,${lat},${lng});
+    way["amenity"="waste_disposal"](around:2000,${lat},${lng});
+    way["landuse"="landfill"](around:2000,${lat},${lng});
+    way["amenity"="recycling"]["recycling_type"="centre"](around:2000,${lat},${lng});
+  );out center body;`
+
+  try {
+    var res = await fetch("https://overpass-api.de/api/interpreter", { method: "POST", body: query })
+    var data = await res.json()
+    var els = data.elements || []
+
+    if (els.length === 0) {
+      setMapStatus("No dumps found nearby")
+      return
+    }
+
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i]
+      var tags = el.tags || {}
+      var lt = el.lat || (el.center && el.center.lat)
+      var ln = el.lon || (el.center && el.center.lon)
+      if (!lt || !ln) continue
+
+      var color, label
+      if (tags.landuse === "landfill") {
+        color = "#c25f5f"; label = "Landfill"
+      } else if (tags.amenity === "waste_disposal") {
+        color = "#e8b84b"; label = "Waste Disposal"
+      } else {
+        color = "#76ae69"; label = "Recycling Centre"
+      }
+
+      var name = tags.name || label
+      L.marker([lt, ln], { icon: circleIcon(color) })
+        .addTo(map)
+        .bindPopup(`<b>${name}</b><br><span style="color:${color};font-size:12px">${label}</span>`)
+    }
+
+    setMapStatus(els.length + " sites found nearby")
+  } catch (e) {
+    setMapStatus("Couldn't load map data")
+    console.log("map error:", e)
+  }
+}
+
+function initMap() {
+  setTimeout(function() {
+    if (!mapInstance) {
+      var defaultLat = 46.0569
+      var defaultLng = 14.5058
+
+      mapInstance = L.map("mapEl").setView([defaultLat, defaultLng], 15)
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 19
+      }).addTo(mapInstance)
+
+      mapInstance.invalidateSize()
+
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          function(pos) {
+            var lat = pos.coords.latitude
+            var lng = pos.coords.longitude
+            mapInstance.setView([lat, lng], 15)
+            mapInstance.invalidateSize()
+            L.circleMarker([lat, lng], {
+              radius: 8,
+              fillColor: "#3b82f6",
+              fillOpacity: 1,
+              color: "white",
+              weight: 2.5
+            }).addTo(mapInstance).bindPopup("You are here")
+            loadRecyclingPoints(mapInstance, lat, lng)
+          },
+          function() {
+            setMapStatus("Location unavailable — showing Ljubljana")
+            loadRecyclingPoints(mapInstance, defaultLat, defaultLng)
+          }
+        )
+      } else {
+        loadRecyclingPoints(mapInstance, defaultLat, defaultLng)
+      }
+    } else {
+      mapInstance.invalidateSize()
+    }
+  }, 150)
+}
+</script>
+</body>
+</html>
