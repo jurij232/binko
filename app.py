@@ -10,20 +10,22 @@ from PIL import Image
 app = Flask(__name__)
 CORS(app)
 
-# Load your Orange classifier
+# Load Orange classifier
 model = pickle.load(open("NNclasifikacija.pkcls", "rb"))
-
-# Get class names from the model
 class_names = [str(c) for c in model.domain.class_var.values]
 print("Classes:", class_names)
 
-# Load Inception v3
+# Load Inception v3 - optimizirano za manj RAM
 embedder = models.inception_v3(weights=models.Inception_V3_Weights.IMAGENET1K_V1)
 embedder.aux_logits = False
 embedder.AuxLogits = None
 embedder.eval()
 
-# Inception v3 preprocessing
+# Zmanjšaj porabo RAM - odstrani gradient tracking
+for param in embedder.parameters():
+    param.requires_grad = False
+
+# Preprocess
 preprocess = transforms.Compose([
     transforms.Resize(299),
     transforms.CenterCrop(299),
@@ -39,6 +41,8 @@ def embed_image(img):
     tensor = preprocess(img).unsqueeze(0)
     with torch.no_grad():
         embedding = embedder(tensor)
+    # Takoj sprosti RAM
+    torch.cuda.empty_cache() if torch.cuda.is_available() else None
     return embedding.numpy().flatten().reshape(1, -1)
 
 @app.route("/predict", methods=["POST"])
