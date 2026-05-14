@@ -1,3 +1,4 @@
+import os
 import pickle
 import torch
 import torchvision.models as models
@@ -14,7 +15,7 @@ model = pickle.load(open("NNclasifikacija.pkcls", "rb"))
 
 # Get class names from the model
 class_names = [str(c) for c in model.domain.class_var.values]
-print("Classes:", class_names)  # so you can see them in the terminal on startup
+print("Classes:", class_names)
 
 # Load Inception v3
 embedder = models.inception_v3(weights=models.Inception_V3_Weights.IMAGENET1K_V1)
@@ -38,7 +39,7 @@ def embed_image(img):
     tensor = preprocess(img).unsqueeze(0)
     with torch.no_grad():
         embedding = embedder(tensor)
-    return embedding.numpy().flatten().reshape(1, -1)  # shape: (1, 1000)
+    return embedding.numpy().flatten().reshape(1, -1)
 
 @app.route("/predict", methods=["POST"])
 def predict():
@@ -50,8 +51,5 @@ def predict():
     return jsonify({"result": label})
 
 if __name__ == "__main__":
-    try:
-        app.run(debug=True)
-    except Exception as e:
-        print("ERROR:", e)
-        input("Press Enter to close...")
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
