@@ -10,19 +10,25 @@ from PIL import Image
 app = Flask(__name__)
 CORS(app)
 
+# Load Orange classifier
 model = pickle.load(open("NNclasifikacija.pkcls", "rb"))
 class_names = [str(c) for c in model.domain.class_var.values]
 print("Classes:", class_names)
 
-# MobileNet namesto Inception v3 - 3x manj RAM!
-embedder = models.mobilenet_v2(weights=models.MobileNet_V2_Weights.IMAGENET1K_V1)
+# Load Inception v3 - optimizirano za manj RAM
+embedder = models.inception_v3(weights=models.Inception_V3_Weights.IMAGENET1K_V1)
+embedder.aux_logits = False
+embedder.AuxLogits = None
 embedder.eval()
+
+# Zmanjšaj porabo RAM - odstrani gradient tracking
 for param in embedder.parameters():
     param.requires_grad = False
 
+# Preprocess
 preprocess = transforms.Compose([
-    transforms.Resize(256),
-    transforms.CenterCrop(224),
+    transforms.Resize(299),
+    transforms.CenterCrop(299),
     transforms.ToTensor(),
     transforms.Normalize(
         mean=[0.485, 0.456, 0.406],
@@ -35,6 +41,8 @@ def embed_image(img):
     tensor = preprocess(img).unsqueeze(0)
     with torch.no_grad():
         embedding = embedder(tensor)
+    # Takoj sprosti RAM
+    torch.cuda.empty_cache() if torch.cuda.is_available() else None
     return embedding.numpy().flatten().reshape(1, -1)
 
 @app.route("/predict", methods=["POST"])
