@@ -3,7 +3,7 @@ import pickle
 import torch
 import torchvision.models as models
 import torchvision.transforms as transforms
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from PIL import Image
 
@@ -15,17 +15,15 @@ model = pickle.load(open("NNclasifikacija.pkcls", "rb"))
 class_names = [str(c) for c in model.domain.class_var.values]
 print("Classes:", class_names)
 
-# Load Inception v3 - optimizirano za manj RAM
+# Load Inception v3
 embedder = models.inception_v3(weights=models.Inception_V3_Weights.IMAGENET1K_V1)
 embedder.aux_logits = False
 embedder.AuxLogits = None
 embedder.eval()
 
-# Zmanjšaj porabo RAM - odstrani gradient tracking
 for param in embedder.parameters():
     param.requires_grad = False
 
-# Preprocess
 preprocess = transforms.Compose([
     transforms.Resize(299),
     transforms.CenterCrop(299),
@@ -41,8 +39,11 @@ def embed_image(img):
     tensor = preprocess(img).unsqueeze(0)
     with torch.no_grad():
         embedding = embedder(tensor)
-    # Takoj sprosti RAM
     return embedding.numpy().flatten().reshape(1, -1)
+
+@app.route("/")
+def index():
+    return send_from_directory("static", "index.html")
 
 @app.route("/predict", methods=["POST"])
 def predict():
