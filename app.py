@@ -45,6 +45,10 @@ def embed_image(img):
 def index():
     return send_from_directory("static", "index.html")
 
+@app.route("/binko.png")
+def logo():
+    return send_from_directory("static", "binko.png")
+
 @app.route("/predict", methods=["POST"])
 def predict():
     file = request.files["image"]
