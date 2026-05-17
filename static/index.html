@@ -6,7 +6,7 @@
 <title>Binko</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<link rel="icon" href="binko.png"> 
+<link rel="icon" href="/static/binko.png"> 
 <style>
 body{
   font-family:Arial;
@@ -410,7 +410,7 @@ body{
 <body>
 
 <div class="topbar">
-  <div class="logo"><img src="binko.png"></div>
+  <div class="logo"><img src="/static/binko.png"></div>
   <div class="hamburger" onclick="toggleMenu()"><span></span><span></span><span></span></div>
 </div>
 
@@ -474,14 +474,18 @@ body{
 <div class="overlay" id="mapOverlay" onclick="backdropClose(event,'mapOverlay')">
   <div class="panel">
     <div class="panel-head"><h3>🗺️ Nearby recycling</h3><button onclick="closePanel('map')">✕</button></div>
-    <div class="map-wrap"><div id="mapEl"></div><div class="map-status" id="mapStatus"></div></div>
+    <div class="map-wrap">
+      <div id="mapEl"></div>
+      <div class="map-status" id="mapStatus"></div>
+    </div>
     <div class="map-legend">
       <span><div class="dot" style="background:#76ae69"></div>Recycling Centre</span>
-      <span><div class="dot" style="background:#3764f8"></div>you</span>
+      <span><div class="dot" style="background:#e8b84b"></div>Waste Disposal</span>
+      <span><div class="dot" style="background:#c25f5f"></div>Landfill</span>
+      <span><div class="dot" style="background:#3764f8"></div>You</span>
     </div>
   </div>
 </div>
-
 <script>
 
 // bin types - maps what the AI says to which bin color and label
@@ -713,27 +717,32 @@ function circleIcon(color) {
 }
 
 async function loadRecyclingPoints(map, lat, lng) {
-  setMapStatus("Loading nearby dumps...", false)
+  setMapStatus("Loading nearby recycling...", false)
 
-  var query = `[out:json][timeout:20];(
-    node["amenity"="waste_disposal"](around:2000,${lat},${lng});
-    node["landuse"="landfill"](around:2000,${lat},${lng});
-    node["amenity"="recycling"]["recycling_type"="centre"](around:2000,${lat},${lng});
-    way["amenity"="waste_disposal"](around:2000,${lat},${lng});
-    way["landuse"="landfill"](around:2000,${lat},${lng});
-    way["amenity"="recycling"]["recycling_type"="centre"](around:2000,${lat},${lng});
+  // Razširjen radius in več kategorij
+  var query = `[out:json][timeout:25];(
+  node["amenity"="recycling"](around:10000,${lat},${lng});
+  node["amenity"="waste_disposal"](around:10000,${lat},${lng});
+  node["amenity"="recycling"]["recycling_type"="centre"](around:10000,${lat},${lng});
+  way["amenity"="recycling"](around:10000,${lat},${lng});
+  way["amenity"="waste_disposal"](around:10000,${lat},${lng});
+  relation["amenity"="recycling"](around:10000,${lat},${lng});
   );out center body;`
 
   try {
-    var res = await fetch("https://overpass-api.de/api/interpreter", { method: "POST", body: query })
+    var res = await fetch("https://overpass-api.de/api/interpreter", {
+      method: "POST",
+      body: "data=" + encodeURIComponent(query)
+    })
     var data = await res.json()
     var els = data.elements || []
 
     if (els.length === 0) {
-      setMapStatus("No dumps found nearby")
+      setMapStatus("No recycling points found nearby")
       return
     }
 
+    var count = 0
     for (var i = 0; i < els.length; i++) {
       var el = els[i]
       var tags = el.tags || {}
@@ -746,17 +755,20 @@ async function loadRecyclingPoints(map, lat, lng) {
         color = "#c25f5f"; label = "Landfill"
       } else if (tags.amenity === "waste_disposal") {
         color = "#e8b84b"; label = "Waste Disposal"
-      } else {
+      } else if (tags["recycling_type"] === "centre") {
         color = "#76ae69"; label = "Recycling Centre"
+      } else {
+        color = "#76ae69"; label = "Recycling Point"
       }
 
       var name = tags.name || label
       L.marker([lt, ln], { icon: circleIcon(color) })
         .addTo(map)
         .bindPopup(`<b>${name}</b><br><span style="color:${color};font-size:12px">${label}</span>`)
+      count++
     }
 
-    setMapStatus(els.length + " sites found nearby")
+    setMapStatus(count + " recycling points found")
   } catch (e) {
     setMapStatus("Couldn't load map data")
     console.log("map error:", e)
@@ -791,15 +803,19 @@ function initMap() {
               fillOpacity: 1,
               color: "white",
               weight: 2.5
-            }).addTo(mapInstance).bindPopup("You are here")
+            }).addTo(mapInstance).bindPopup("You are here").openPopup()
             loadRecyclingPoints(mapInstance, lat, lng)
           },
-          function() {
+          function(err) {
+            console.log("Geolocation error:", err.code, err.message)
             setMapStatus("Location unavailable — showing Ljubljana")
             loadRecyclingPoints(mapInstance, defaultLat, defaultLng)
-          }
+          },
+          // Dodaj opcije za boljšo geolokacijo
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         )
       } else {
+        setMapStatus("Geolocation not supported — showing Ljubljana")
         loadRecyclingPoints(mapInstance, defaultLat, defaultLng)
       }
     } else {
