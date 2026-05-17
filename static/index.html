@@ -419,6 +419,8 @@ body{
   <p onclick="openPanel('history');renderHistory()">📜 History</p>
   <p onclick="openPanel('map');initMap()">🗺️ Map</p>
   <p onclick="openPanel('about')">ℹ️ About</p>
+  <p onclick="window.open('https://1ka.arnes.si/a/4ef84d77', '_blank')">📊 Survey</p>
+  
 </div>
 
 <div class="page">
@@ -486,6 +488,25 @@ body{
     </div>
   </div>
 </div>
+
+  <!-- SURVEY -->
+<div class="overlay" id="surveyOverlay">
+  <div class="panel">
+    <div class="panel-head">
+      <h3>📊 Quick Survey</h3>
+      <button onclick="closeSurvey()">✕</button>
+    </div>
+    <div class="panel-body" style="padding:20px;text-align:center;color:#444;font-size:14px;line-height:1.6">
+      <p>Enjoying Binko? 🌿</p>
+      <p>We'd love to hear your feedback!</p>
+    </div>
+    <div class="panel-foot" style="display:flex;gap:10px;justify-content:center">
+      <button onclick="closeSurvey()">Maybe later</button>
+      <button onclick="openSurvey()" style="border-color:#76ae69;color:#76ae69">Take survey →</button>
+    </div>
+  </div>
+</div>
+  
 <script>
 
 // bin types - maps what the AI says to which bin color and label
@@ -572,6 +593,7 @@ function addToHistory(result, thumb) {
   // dont let it grow forever
   if (scanHistory.length > 50) scanHistory.pop()
   saveHistory()
+    checkSurvey()
 }
 
 function renderHistory() {
@@ -610,6 +632,27 @@ function flagHistory(i) {
   saveHistory()
   renderHistory()
 }
+
+
+function closeSurvey() {
+  document.getElementById("surveyOverlay").classList.remove("open")
+  localStorage.setItem("binko_survey", "true")
+}
+
+function openSurvey() {
+  closeSurvey()
+  window.open("https://1ka.arnes.si/a/4ef84d77", "_blank")
+}
+
+function checkSurvey() {
+  if (localStorage.getItem("binko_survey")) return
+  if (scanHistory.length === 10) {
+    setTimeout(function() {
+      document.getElementById("surveyOverlay").classList.add("open")
+    }, 5000)
+  }
+}
+
 
 // show the result popup
 function showResult(text) {
