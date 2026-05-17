@@ -676,7 +676,7 @@ async function takePhoto() {
     try {
       var fd = new FormData()
       fd.append("image", blob, "photo.jpg")
-      var res = await fetch("https://binko.onrender.com/predict", { method: "POST", body: fd })
+     var res = await fetch("https://binko-c8nv.onrender.com/predict", { method: "POST", body: fd })
       var data = await res.json()
       result = data.result
     } catch (e) {
